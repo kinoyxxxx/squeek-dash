@@ -548,18 +548,23 @@ function draw(dt) {
     }
   }
 
-  /* hamster */
+  /* hamster — always 100% opaque (invincibility shows as a shield ring, never fade) */
   const h = G.ham;
-  const grounded = h.y >= gy - HAM_R - 1;
+  let hx = h.x, hy = h.y;
+  if (G.mode === "menu") { hx = W * 0.2; hy = gy - HAM_R; }   // idle pose behind the start veil
+  const grounded = hy >= gy - HAM_R - 1;
   const runBob = grounded && G.mode === "play" ? Math.abs(Math.sin(G.t * (10 + speed() / 40))) * 4 : 0;
-  const blink = h.inv > 0 && ((G.t * 14) | 0) % 2 === 0;
   ctx.save();
-  ctx.translate(h.x, h.y - runBob);
-  ctx.rotate(h.rot);
-  ctx.globalAlpha = blink ? 0.35 : 1;
+  ctx.translate(hx, hy - runBob);
+  ctx.rotate(G.mode === "menu" ? 0 : h.rot);
+  ctx.globalAlpha = 1;
   ctx.font = "46px serif";
   ctx.fillText("🐹", 0, 2);
   ctx.restore();
+  if (h.inv > 0 && G.mode === "play") {
+    ctx.strokeStyle = "rgba(127,255,154,.85)"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(hx, hy - runBob, HAM_R + 9 + Math.sin(G.t * 10) * 2, 0, Math.PI * 2); ctx.stroke();
+  }
   /* dust while running */
   if (grounded && G.mode === "play" && Math.random() < 0.35) {
     G.particles.push({ x: h.x - 18, y: gy - 2, vx: -40 - Math.random() * 60, vy: -20 - Math.random() * 40,
