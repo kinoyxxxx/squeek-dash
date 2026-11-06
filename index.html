@@ -1,298 +1,615 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Squeek Dash — Beat the Wheel</title>
-<meta name="description" content="A one-button arcade game about a hamster, a wheel, and perfect timing. Synced live with the real Squeekchain wheel: when the real hamster runs, your bonus doubles." />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Squeek Dash — Jump! | A Squeekchain Hamster Jumping Challenge</title>
+<meta name="description" content="Squeek Dash is a one-button jumping challenge synced live with the real Squeekchain hamster wheel. Leap rocks, puddles and runaway cheese wheels, grab sunflower seeds — and score double while the real wheel is spinning.">
+<meta name="theme-color" content="#17301d">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Squeek Dash — Jump!">
+<meta property="og:description" content="A one-button hamster jumping challenge synced live with the real Squeekchain wheel. Double rewards while the real wheel spins.">
+<meta property="og:url" content="https://squeekdash.duckdns.org/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐹</text></svg>">
 <style>
-  :root{
-    --paper:#fff6e9; --ink:#14213d; --coral:#f95738; --gold:#f2b035; --teal:#2a9d8f;
-    --card:#fffdf7; --line:#14213d22;
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;
+    background:#17301d; color:#fff; user-select:none; -webkit-user-select:none;
+    touch-action:none;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0}
-  body{
-    background:var(--paper); color:var(--ink);
-    font-family:ui-rounded,"Avenir Next","Segoe UI",system-ui,sans-serif;
-    min-height:100dvh; display:flex; flex-direction:column; align-items:center;
+  #wrap { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; cursor:pointer; }
+
+  #hud {
+    position:absolute; top:0; left:0; right:0; padding:10px 12px;
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;
+    pointer-events:none; z-index:5;
   }
-  header{width:100%; max-width:560px; padding:18px 16px 4px; text-align:center}
-  h1{margin:0; font-size:clamp(28px,7vw,40px); letter-spacing:.5px}
-  h1 .dash{color:var(--coral)}
-  .tag{margin:4px 0 0; opacity:.75; font-size:14px}
-  #livebar{
-    margin:12px auto 0; max-width:520px; width:calc(100% - 32px);
-    border:2px solid var(--ink); border-radius:999px; padding:7px 14px;
-    display:flex; justify-content:space-between; gap:8px; align-items:center;
-    background:var(--card); font-size:13px; font-weight:600;
+  .pill {
+    background:rgba(12,30,16,.72); border:1px solid rgba(255,255,255,.16);
+    border-radius:999px; padding:6px 13px; font-size:15px; font-weight:700;
+    backdrop-filter:blur(4px); white-space:nowrap;
   }
-  #livebar .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex:none}
-  #livebar.on .dot{background:#37d67a; box-shadow:0 0 0 4px #37d67a33; animation:pulse 1s infinite}
-  @keyframes pulse{50%{box-shadow:0 0 0 7px #37d67a11}}
-  #livebar .bonus{color:var(--coral); display:none}
-  #livebar.on .bonus{display:inline}
-  main{width:100%; max-width:560px; padding:8px 16px 0; display:flex; flex-direction:column; align-items:center}
-  #hud{
-    width:100%; display:flex; justify-content:space-between; align-items:center;
-    font-weight:800; font-size:15px; padding:6px 2px;
+  .pill small { font-weight:600; opacity:.75; font-size:11px; letter-spacing:.06em; }
+  #livePill { display:none; color:#ff8fa3; border-color:rgba(255,110,140,.55); }
+  #livePill.on { display:inline-block; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { transform:scale(1.07); } }
+
+  .ctl {
+    position:absolute; z-index:6; pointer-events:auto;
+    background:rgba(12,30,16,.72); border:1px solid rgba(255,255,255,.2); color:#fff;
+    border-radius:999px; width:42px; height:42px; font-size:19px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
   }
-  #hud .hearts{letter-spacing:2px; color:var(--coral)}
-  #stage{
-    position:relative; width:min(92vw,440px); aspect-ratio:1; margin:4px auto;
-    touch-action:manipulation; user-select:none; cursor:pointer;
+  .ctl:active { transform:scale(.93); }
+  #soundBtn { right:12px; bottom:52px; }
+  #pauseBtn { right:62px; bottom:52px; }
+
+  #foot {
+    position:absolute; left:0; right:0; bottom:0; padding:7px 12px; z-index:4;
+    text-align:center; font-size:12px; color:rgba(255,255,255,.68);
+    background:linear-gradient(transparent, rgba(6,18,8,.6)); pointer-events:none;
   }
-  #stage.shake{animation:shake .3s}
-  @keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
-  svg{width:100%; height:100%; display:block}
-  #callout{
-    position:absolute; left:50%; top:8px; transform:translateX(-50%);
-    font-weight:900; font-size:20px; color:var(--teal); opacity:0; pointer-events:none;
-    transition:opacity .15s, transform .15s; text-shadow:0 2px 0 #fff;
+  #foot b { color:#ffd76a; }
+
+  .veil {
+    position:absolute; inset:0; z-index:10; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:24px;
+    background:radial-gradient(ellipse at center, rgba(16,38,20,.5), rgba(10,24,12,.92));
   }
-  #callout.show{opacity:1; transform:translateX(-50%) translateY(4px) scale(1.08)}
-  #bigbtn{
-    margin:10px 0 4px; background:var(--coral); color:#fff; border:3px solid var(--ink);
-    border-radius:999px; padding:14px 42px; font-size:19px; font-weight:900; letter-spacing:.5px;
-    box-shadow:0 4px 0 var(--ink); cursor:pointer; font-family:inherit;
+  .veil.hidden { display:none; }
+  .veil .ham { font-size:74px; animation:bob 1.1s ease-in-out infinite; }
+  @keyframes bob { 50% { transform:translateY(-12px) rotate(-5deg); } }
+  .veil h1 {
+    font-size:clamp(38px,8vw,58px); line-height:1.02; margin:6px 0 2px;
+    background:linear-gradient(92deg,#ffd76a,#ff9d5c 55%,#ff6b9d);
+    -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:900;
   }
-  #bigbtn:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ink)}
-  .howto{max-width:520px; font-size:14px; line-height:1.55; opacity:.85; text-align:center; margin:10px 16px 0}
-  #overlay{
-    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:#fff6e9ee; border-radius:24px; text-align:center; padding:20px; gap:8px;
+  .veil h2 { font-size:15px; font-weight:600; color:#cdeed3; letter-spacing:.14em; text-transform:uppercase; }
+  .veil p { max-width:440px; color:#eef7ee; font-size:15.5px; line-height:1.55; margin:14px 0 4px; }
+  .veil p .k { color:#ffd76a; font-weight:800; }
+  .bigbtn {
+    margin-top:20px; pointer-events:auto; cursor:pointer; border:none;
+    font-size:19px; font-weight:900; letter-spacing:.03em; color:#331b00;
+    padding:14px 38px; border-radius:999px;
+    background:linear-gradient(180deg,#ffe066,#ffb52e);
+    box-shadow:0 6px 0 #c77400, 0 12px 26px rgba(0,0,0,.45);
   }
-  #overlay h2{margin:0; font-size:30px}
-  #overlay p{margin:0; font-size:15px; line-height:1.5}
-  #overlay .score{font-size:20px; font-weight:900}
-  footer{margin-top:auto; width:100%; max-width:560px; padding:22px 16px 26px; text-align:center; font-size:13px; opacity:.75; line-height:1.6}
-  footer a{color:var(--ink); font-weight:700}
-  .kbd{border:1.5px solid var(--ink); border-bottom-width:3px; border-radius:6px; padding:0 6px; font-weight:800; background:#fff}
+  .bigbtn:active { transform:translateY(4px); box-shadow:0 2px 0 #c77400; }
+  .bestline { margin-top:14px; font-size:14px; color:#b9d8be; }
+  .bestline b { color:#fff; }
+  #finalScore { font-size:60px; font-weight:900; color:#ffd76a; line-height:1.05; margin-top:4px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>SQUEEK <span class="dash">DASH</span></h1>
-  <p class="tag">One hamster. One wheel. One perfectly timed hop.</p>
-  <div id="livebar"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span><span id="livetext">Real wheel: connecting…</span></span><span class="bonus">ZOOMIES BONUS ×2</span></div>
-</header>
+<div id="wrap">
+  <canvas id="game"></canvas>
 
-<main>
   <div id="hud">
-    <span>🌰 <span id="seeds">0</span></span>
-    <span id="combo">COMBO ×1</span>
-    <span>LV <span id="level">1</span></span>
-    <span class="hearts" id="hearts">♥♥♥</span>
+    <span class="pill">🏁 <span id="dist">0</span><small> m</small></span>
+    <span class="pill">🌻 <span id="seeds">0</span></span>
+    <span class="pill" id="speedPill">🏃 <span id="speedName">JOG</span></span>
+    <span class="pill" id="livePill">🔴 LIVE <small id="rpmText"></small></span>
+    <span class="pill" id="hearts">❤️❤️❤️</span>
   </div>
 
-  <div id="stage" aria-label="Game stage. Tap or press space when the bead crosses the golden zone.">
-    <svg viewBox="0 0 400 400" role="img" aria-label="A hamster running in a wheel">
-      <!-- golden catch zone -->
-      <path id="zone" fill="none" stroke="#f2b035" stroke-width="17" stroke-linecap="round" opacity="0.95"/>
-      <!-- wheel -->
-      <g id="wheel">
-        <circle cx="200" cy="200" r="150" fill="none" stroke="#14213d" stroke-width="10"/>
-        <circle cx="200" cy="200" r="128" fill="none" stroke="#14213d" stroke-width="3" opacity="0.35"/>
-        <g stroke="#14213d" stroke-width="7" stroke-linecap="round">
-          <line x1="200" y1="200" x2="200" y2="58"/><line x1="200" y1="200" x2="323" y2="129"/>
-          <line x1="200" y1="200" x2="323" y2="271"/><line x1="200" y1="200" x2="200" y2="342"/>
-          <line x1="200" y1="200" x2="77" y2="271"/><line x1="200" y1="200" x2="77" y2="129"/>
-        </g>
-        <!-- hamster riding the rim -->
-        <g id="hamster" transform="translate(200 200)">
-          <ellipse cx="0" cy="-158" rx="30" ry="24" fill="#e8a04c"/>
-          <circle cx="-16" cy="-178" r="9" fill="#e8a04c"/><circle cx="16" cy="-178" r="9" fill="#e8a04c"/>
-          <circle cx="-16" cy="-178" r="4.5" fill="#f7cf9f"/><circle cx="16" cy="-178" r="4.5" fill="#f7cf9f"/>
-          <ellipse cx="10" cy="-152" rx="13" ry="10" fill="#f7cf9f"/>
-          <circle cx="20" cy="-160" r="3.4" fill="#14213d"/>
-          <circle cx="-4" cy="-164" r="3" fill="#14213d"/>
-          <path d="M 26 -150 q 8 3 5 9" stroke="#14213d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        </g>
-        <circle cx="200" cy="200" r="17" fill="#f95738" stroke="#14213d" stroke-width="5"/>
-      </g>
-      <!-- the bead to catch -->
-      <circle id="bead" r="13" fill="#2a9d8f" stroke="#14213d" stroke-width="4"/>
-      <!-- stand -->
-      <path d="M200 350 L150 392 M200 350 L250 392" stroke="#14213d" stroke-width="9" stroke-linecap="round"/>
-    </svg>
-    <div id="callout"></div>
-    <div id="overlay">
-      <h2 id="ovtitle">Ready?</h2>
-      <p id="ovtext">The bead rides the rim. Tap (or press <span class="kbd">SPACE</span>) the moment it crosses the <b>golden zone</b> to snatch the seed. Bad taps cost a heart — the wheel only speeds up from here.</p>
-      <p class="score" id="ovscore" style="display:none"></p>
-      <button id="bigbtn">START</button>
-      <p style="font-size:13px;opacity:.7">Best: <span id="best">0</span> 🌰</p>
-    </div>
+  <button class="ctl" id="pauseBtn" title="Pause">⏸️</button>
+  <button class="ctl" id="soundBtn" title="Sound on/off">🔊</button>
+
+  <div id="foot">🐹 <b>Squeek Dash</b> — synced live with the real <b>Squeekchain</b> hamster wheel · seeds ×2 while it spins · <span id="workText">wheel data: connecting…</span></div>
+
+  <div class="veil" id="startVeil">
+    <div class="ham">🐹</div>
+    <h1>SQUEEK DASH</h1>
+    <h2>The jumping challenge</h2>
+    <p>The garden path is full of trouble: <span class="k">rocks 🪨</span>, <span class="k">puddles 💧</span> and
+       <span class="k">runaway cheese wheels 🧀</span>. <span class="k">Tap or press SPACE to jump</span> — tap again mid-air for a
+       <span class="k">double jump</span>. Bounce on <span class="k">mushrooms 🍄</span> to fly, grab <span class="k">sunflower seeds 🌻</span>
+       on the way, and watch out: the longer you run, the faster it gets. 3 stumbles and the run ends.</p>
+    <p>⚡ This game listens to the <b>real Squeekchain wheel</b>: while the actual hamster is running, every seed is worth <span class="k">double</span>.</p>
+    <button class="bigbtn" id="startBtn">▶ START JUMPING</button>
+    <div class="bestline">Best run: <b id="bestStart">0</b> m · <b id="bestSeedsStart">0</b> 🌻</div>
   </div>
 
-  <p class="howto">The wheel breathes like a real hamster — naps, jogs, and sudden zoomies. And it listens to the <b>actual Squeekchain wheel</b>: when the real hamster runs, your seed bonus doubles. Nobody knows when. That's the game.</p>
-</main>
-
-<footer>
-  Built for <a href="https://squeekchain.com/genesis" target="_blank" rel="noopener">Squeekchain Genesis</a> — the hamster-powered toychain on Ethereum.<br/>
-  A community mini-game by Squeekbo. Not affiliated with the Squeekchain team. Sepolia testnet era.
-</footer>
+  <div class="veil hidden" id="overVeil">
+    <div class="ham">😵</div>
+    <h2>The hamster tumbles!</h2>
+    <div id="finalScore">0 m</div>
+    <p><span id="finalSeeds">0</span> 🌻 harvested <span id="newBest"></span></p>
+    <div class="bestline">Best run: <b id="bestOver">0</b> m</div>
+    <button class="bigbtn" id="againBtn">↻ RUN AGAIN</button>
+  </div>
+</div>
 
 <script>
 "use strict";
-// ---------- helpers ----------
-const $ = id => document.getElementById(id);
-const TAU = Math.PI * 2;
-const polar = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-function arcPath(cx, cy, r, a0, a1){
-  const [x0,y0] = polar(cx,cy,r,a0), [x1,y1] = polar(cx,cy,r,a1);
-  return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${a1-a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+/* ============================================================
+   SQUEEK DASH — The Jumping Challenge
+   A one-button endless jumper synced live with the real
+   Squeekchain hamster wheel.
+   Live data: https://api.squeekchain.com/v1/status
+   (measurement.rpmMilli, cumulativeWorkUnits). While the real
+   wheel spins, seeds are worth double.
+   ============================================================ */
+
+const cv = document.getElementById("game");
+const ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+const groundY = () => H - Math.max(84, H * 0.16);
+
+/* ---------------- Audio ---------------- */
+let AC = null, soundOn = true;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === "suspended") AC.resume();
+  return AC;
+}
+function tone(f0, f1, dur, type, vol, delay) {
+  if (!soundOn) return;
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + (delay || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || "sine";
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
+  g.gain.setValueAtTime(vol || 0.15, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const sJump   = () => tone(300, 640, 0.14, "sine", 0.14);
+const sJump2  = () => tone(520, 940, 0.14, "sine", 0.14);
+const sSeed   = () => tone(980, 1420, 0.09, "triangle", 0.13);
+const sGold   = () => { tone(1046, 1046, 0.08, "triangle", 0.18); tone(1568, 2093, 0.15, "triangle", 0.16, 0.06); };
+const sBounce = () => tone(200, 900, 0.2, "sine", 0.17);
+const sHit    = () => tone(240, 80, 0.25, "sawtooth", 0.11);
+const sOver   = () => { tone(523, 523, 0.14, "sine", 0.15); tone(392, 392, 0.14, "sine", 0.15, 0.15); tone(330, 262, 0.32, "sine", 0.15, 0.3); };
+
+/* ---------------- State ---------------- */
+const G = {
+  mode: "menu", paused: false,
+  t: 0, dist: 0, seeds: 0, hearts: 3,
+  best: +(localStorage.getItem("squeekdash_best_m") || 0),
+  bestSeeds: +(localStorage.getItem("squeekdash_best_seeds") || 0),
+  ham: { x: 0, y: 0, vy: 0, jumps: 0, rot: 0, inv: 0 },
+  obs: [],        // {x, w, h, kind: rock|cactus|cheese|puddle, vx}
+  pickups: [],    // {x, y, golden, taken}
+  pads: [],       // {x} mushrooms
+  particles: [], floats: [],
+  spawnT: 1.2, shake: 0, flash: 0,
+  live: false, rpm: 0, work: null,
+  scroll: 0,
+};
+const HAM_R = 21;
+function speed() {
+  const base = 300 + Math.min(340, G.dist * 0.55);       // ramps up with distance
+  return base * (G.live ? 1.18 : 1);
+}
+function tierName() {
+  const s = speed();
+  return s < 400 ? "💤 WARM-UP" : s < 540 ? "🏃 JOG" : "⚡ ZOOMIES";
+}
+function heartsText() { return "❤️".repeat(G.hearts) + "🖤".repeat(Math.max(0, 3 - G.hearts)); }
+function syncHud() {
+  document.getElementById("dist").textContent = Math.floor(G.dist);
+  document.getElementById("seeds").textContent = G.seeds;
+  document.getElementById("speedName").textContent = tierName().split(" ")[1];
+  document.getElementById("speedPill").childNodes[0].textContent = tierName().split(" ")[0] + " ";
+  document.getElementById("hearts").textContent = heartsText();
 }
 
-// ---------- live wheel feed (seasoning; game is fully playable offline) ----------
-const live = { on:false, rpm:0, status:"—" };
-async function pollLive(){
-  try{
-    const r = await fetch("https://api.squeekchain.com/v1/status", { cache:"no-store" });
+/* ---------------- Live Squeekchain sync ---------------- */
+async function pollLive() {
+  try {
+    const r = await fetch("https://api.squeekchain.com/v1/status", { cache: "no-store" });
+    if (!r.ok) throw new Error("bad status");
     const j = await r.json();
-    const m = j.measurement || {};
-    live.rpm = (m.rpmMilli || 0) / 1000;
-    live.status = m.coreStatus || "—";
-    live.on = live.rpm > 0;
-  }catch(e){ live.on = false; live.status = "offline"; }
-  $("livebar").classList.toggle("on", live.on);
-  $("livetext").textContent = live.on
-    ? `Real wheel: RUNNING at ${live.rpm.toFixed(1)} RPM`
-    : `Real wheel: ${live.status === "IDLE" ? "napping" : live.status.toLowerCase()} — bonus armed when it runs`;
-}
-pollLive(); setInterval(pollLive, 5000);
-
-// ---------- game state ----------
-const S = {
-  playing:false, angle:0, speed:0, bead:0, beadActive:false,
-  seeds:0, combo:1, bestCombo:1, lives:3, level:1, collected:0,
-  zoneStart:-0.65, zoneSize:0.55, engineT:0, engineState:"jog", engineDur:5,
-  lastTs:0, grace:0,
-};
-const best = +(localStorage.getItem("squeekdash_best") || 0);
-$("best").textContent = best;
-
-// hamster engine: nap / jog / zoomies bouts, weighted like a real hamster's week
-const ENGINE = {
-  nap:     { target: 0.55, w: 62, dur:[3,7]  },
-  jog:     { target: 1.55, w: 20, dur:[4,9]  },
-  zoomies: { target: 3.1,  w: 18, dur:[3,6]  },
-};
-function pickEngine(){
-  let r = Math.random() * 100, acc = 0;
-  for (const k in ENGINE){ acc += ENGINE[k].w; if (r <= acc) return k; }
-  return "jog";
-}
-function newBout(){
-  S.engineState = pickEngine();
-  const [a,b] = ENGINE[S.engineState].dur;
-  S.engineDur = a + Math.random() * (b - a);
-  S.engineT = 0;
-}
-function spawnBead(){
-  // bead appears ahead of the zone, riding the rim in the wheel's direction
-  S.bead = S.zoneStart - (1.1 + Math.random() * 1.6);
-  S.beadActive = true;
-}
-function zoneEnd(){ return S.zoneStart + S.zoneSize; }
-function inZone(a){ return a >= S.zoneStart && a <= zoneEnd(); }
-
-function callout(txt, color){
-  const c = $("callout");
-  c.textContent = txt; c.style.color = color || "#2a9d8f";
-  c.classList.add("show");
-  setTimeout(() => c.classList.remove("show"), 650);
-}
-function stumble(){
-  S.lives--; S.combo = 1;
-  $("stage").classList.remove("shake"); void $("stage").offsetWidth;
-  $("stage").classList.add("shake");
-  callout("OUCH!", "#f95738");
-  updateHud();
-  if (S.lives <= 0) gameOver();
-}
-function collect(){
-  const mult = S.combo * (live.on ? 2 : 1);
-  const gained = 10 * mult;
-  S.seeds += gained; S.collected++;
-  callout(`+${gained} 🌰`, live.on ? "#f95738" : "#2a9d8f");
-  S.combo = Math.min(8, S.combo + 1);
-  S.bestCombo = Math.max(S.bestCombo, S.combo);
-  if (S.collected % 10 === 0){
-    S.level++;
-    S.zoneSize = Math.max(0.16, S.zoneSize * 0.88);
-    callout("LEVEL " + S.level + "!", "#14213d");
+    const rpmMilli = j && j.measurement ? +j.measurement.rpmMilli || 0 : 0;
+    const core = String((j && j.coreStatus) || (j && j.measurement && j.measurement.coreStatus) || "");
+    G.work = j && j.cumulativeWorkUnits != null ? j.cumulativeWorkUnits
+           : (j && j.measurement ? j.measurement.cumulativeWorkUnits : null);
+    G.rpm = rpmMilli / 1000;
+    G.live = rpmMilli > 0 || /run|active|spin/i.test(core);
+    document.getElementById("livePill").classList.toggle("on", G.live);
+    document.getElementById("rpmText").textContent = G.live ? "· " + G.rpm.toFixed(1) + " RPM" : "";
+    document.getElementById("workText").textContent =
+      "wheel data: " + (G.live ? "LIVE — the real hamster is running!" : "wheel resting")
+      + (G.work != null ? " · total work " + Number(G.work).toLocaleString() + " units" : "");
+  } catch (e) {
+    document.getElementById("workText").textContent = "wheel data: offline mode";
   }
-  S.beadActive = false;
-  setTimeout(() => { if (S.playing) spawnBead(); }, 350);
-  updateHud();
+  syncHud();
 }
-function tap(){
-  if (!S.playing) return;
-  if (S.beadActive && inZone(S.bead)) collect();
-  else if (S.beadActive) stumble();
+pollLive();
+setInterval(pollLive, 15000);
+
+/* ---------------- FX ---------------- */
+function burst(x, y, col, n) {
+  for (let i = 0; i < (n || 14); i++) {
+    const a = Math.random() * Math.PI * 2, s = 50 + Math.random() * 210;
+    G.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 70,
+      life: 0.55 + Math.random() * 0.45, t: 0, r: 2.5 + Math.random() * 3.5, col });
+  }
 }
-function gameOver(){
-  S.playing = false;
-  const isBest = S.seeds > best;
-  if (isBest) localStorage.setItem("squeekdash_best", S.seeds);
-  $("best").textContent = Math.max(best, S.seeds);
-  $("ovtitle").textContent = "The wheel rests.";
-  $("ovtext").innerHTML = isBest ? "A new personal best. The hamster is proud of you." : "The seed stash is safe. The wheel, however, believes in you.";
-  $("ovscore").style.display = "block";
-  $("ovscore").textContent = `${S.seeds} 🌰 · best combo ×${S.bestCombo} · level ${S.level}`;
-  $("bigbtn").textContent = "RUN AGAIN";
-  $("overlay").style.display = "flex";
-}
-function start(){
-  Object.assign(S, { playing:true, seeds:0, combo:1, bestCombo:1, lives:3, level:1,
-    collected:0, zoneSize:0.55, speed:1.2, beadActive:false });
-  newBout(); spawnBead();
-  $("overlay").style.display = "none";
-  updateHud();
-}
-function updateHud(){
-  $("seeds").textContent = S.seeds;
-  $("combo").textContent = "COMBO ×" + S.combo * (live.on ? 2 : 1);
-  $("level").textContent = S.level;
-  $("hearts").textContent = "♥".repeat(Math.max(0, S.lives)) + "♡".repeat(Math.max(0, 3 - S.lives));
+function floatText(x, y, txt, col, big) {
+  G.floats.push({ x, y, txt, col, t: 0, life: 1.0, big: !!big });
 }
 
-// ---------- render loop ----------
-function frame(ts){
-  const dt = Math.min(0.05, (ts - S.lastTs) / 1000 || 0);
-  S.lastTs = ts;
-  if (S.playing){
-    S.engineT += dt;
-    if (S.engineT >= S.engineDur) newBout();
-    const target = ENGINE[S.engineState].target * (1 + (S.level - 1) * 0.07);
-    S.speed += (target - S.speed) * Math.min(1, dt * 1.4);
-    S.angle = (S.angle + S.speed * dt) % TAU;
-    if (S.beadActive){
-      S.bead += S.speed * dt;
-      if (S.bead > zoneEnd() + 0.02){ // slipped past the zone untouched
-        S.beadActive = false; S.combo = 1; updateHud();
-        setTimeout(() => { if (S.playing) spawnBead(); }, 300);
+/* ---------------- Spawning ---------------- */
+function spawnPattern() {
+  const x0 = W + 60;
+  const roll = Math.random();
+  if (roll < 0.34) {
+    // obstacle cluster
+    const kinds = ["rock", "cactus", "cheese"];
+    const k = kinds[(Math.random() * kinds.length) | 0];
+    const n = Math.random() < 0.4 && G.dist > 250 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      G.obs.push({ x: x0 + i * 52, w: 40, h: k === "cactus" ? 52 : 38, kind: k, rot: 0 });
+    }
+    // seed arc above the obstacle — rewards a clean jump
+    const arcN = 4;
+    for (let i = 0; i < arcN; i++) {
+      const px = x0 - 26 + i * 38;
+      const py = groundY() - 92 - Math.sin((i / (arcN - 1)) * Math.PI) * 52;
+      G.pickups.push({ x: px, y: py, golden: false, taken: false, ph: Math.random() * 6 });
+    }
+  } else if (roll < 0.52) {
+    // puddle — must be airborne over it
+    G.obs.push({ x: x0, w: 96 + Math.random() * 60, h: 10, kind: "puddle", rot: 0 });
+  } else if (roll < 0.68) {
+    // mushroom bounce pad + high seed trail
+    G.pads.push({ x: x0 });
+    for (let i = 0; i < 5; i++) {
+      G.pickups.push({ x: x0 + 70 + i * 44, y: groundY() - 205 - Math.sin(i / 4 * Math.PI) * 30,
+        golden: i === 2, taken: false, ph: Math.random() * 6 });
+    }
+  } else {
+    // seed line / arc on open ground, one maybe golden
+    const n = 4 + ((Math.random() * 3) | 0);
+    const high = Math.random() < 0.5;
+    for (let i = 0; i < n; i++) {
+      G.pickups.push({ x: x0 + i * 46, y: groundY() - (high ? 120 + Math.sin(i / (n - 1) * Math.PI) * 40 : 46),
+        golden: Math.random() < 0.08, taken: false, ph: Math.random() * 6 });
+    }
+  }
+  const gapBase = 0.95 + Math.random() * 0.9;
+  G.spawnT = gapBase * (430 / Math.max(speed(), 1)) * 1.9;
+}
+
+/* ---------------- Input ---------------- */
+function jump() {
+  if (G.mode !== "play" || G.paused) return;
+  const h = G.ham;
+  if (h.jumps < 2) {
+    h.vy = h.jumps === 0 ? -880 : -790;
+    h.jumps += 1;
+    if (h.jumps === 1) sJump(); else sJump2();
+    burst(h.x, h.y + HAM_R, "#cfe8c8", 6);
+  }
+}
+cv.addEventListener("pointerdown", e => { e.preventDefault(); jump(); });
+window.addEventListener("keydown", e => {
+  if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); }
+  if (e.code === "KeyP") togglePause();
+});
+
+/* ---------------- Flow ---------------- */
+function startGame() {
+  G.mode = "play"; G.paused = false;
+  G.dist = 0; G.seeds = 0; G.hearts = 3;
+  G.obs = []; G.pickups = []; G.pads = []; G.particles = []; G.floats = [];
+  G.spawnT = 1.1; G.scroll = 0;
+  G.ham = { x: W * 0.2, y: groundY() - HAM_R, vy: 0, jumps: 0, rot: 0, inv: 0 };
+  document.getElementById("startVeil").classList.add("hidden");
+  document.getElementById("overVeil").classList.add("hidden");
+  syncHud(); ac();
+}
+function gameOver() {
+  G.mode = "over"; sOver();
+  const m = Math.floor(G.dist);
+  const isBest = m > G.best;
+  if (isBest) { G.best = m; localStorage.setItem("squeekdash_best_m", String(m)); }
+  if (G.seeds > G.bestSeeds) { G.bestSeeds = G.seeds; localStorage.setItem("squeekdash_best_seeds", String(G.seeds)); }
+  document.getElementById("finalScore").textContent = m + " m";
+  document.getElementById("finalSeeds").textContent = G.seeds;
+  document.getElementById("bestOver").textContent = G.best;
+  document.getElementById("newBest").textContent = isBest ? "· 🏆 NEW BEST RUN!" : "";
+  document.getElementById("overVeil").classList.remove("hidden");
+}
+function stumble(why) {
+  const h = G.ham;
+  if (h.inv > 0 || G.mode !== "play") return;
+  G.hearts -= 1; G.flash = 0.55; G.shake = 9; h.inv = 1.4;
+  sHit();
+  floatText(h.x, h.y - 44, why, "#ff7d7d", true);
+  burst(h.x, h.y, "#ff9d9d", 16);
+  syncHud();
+  if (G.hearts <= 0) gameOver();
+}
+function togglePause() {
+  if (G.mode !== "play") return;
+  G.paused = !G.paused;
+  document.getElementById("pauseBtn").textContent = G.paused ? "▶️" : "⏸️";
+}
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("againBtn").addEventListener("click", startGame);
+document.getElementById("pauseBtn").addEventListener("click", togglePause);
+document.getElementById("soundBtn").addEventListener("click", function () {
+  soundOn = !soundOn;
+  this.textContent = soundOn ? "🔊" : "🔇";
+  if (soundOn) sSeed();
+});
+document.getElementById("bestStart").textContent = G.best;
+document.getElementById("bestSeedsStart").textContent = G.bestSeeds;
+
+/* ---------------- Update ---------------- */
+function update(dt) {
+  const gy = groundY();
+  const sp = speed();
+  G.scroll += sp * dt;
+  G.dist += sp * dt / 46;                    // ≈ metres
+  const h = G.ham;
+  h.x = W * 0.2;
+
+  // gravity + ground
+  h.vy += 2350 * dt;
+  h.y += h.vy * dt;
+  if (h.y >= gy - HAM_R) {
+    h.y = gy - HAM_R;
+    if (h.vy > 500) burst(h.x - 10, gy, "#b9d8be", 5);
+    h.vy = 0; h.jumps = 0; h.rot = 0;
+  } else {
+    h.rot = Math.max(-0.35, Math.min(0.5, h.vy / 1600));
+  }
+  if (h.inv > 0) h.inv -= dt;
+
+  // spawning
+  G.spawnT -= dt;
+  if (G.spawnT <= 0) spawnPattern();
+
+  const hamBox = { l: h.x - HAM_R + 7, r: h.x + HAM_R - 7, t: h.y - HAM_R + 6, b: h.y + HAM_R - 2 };
+
+  // obstacles
+  G.obs = G.obs.filter(o => o.x + o.w > -80);
+  for (const o of G.obs) {
+    o.x -= sp * dt * (o.kind === "cheese" ? 1.22 : 1);
+    if (o.kind === "cheese") o.rot -= dt * 6;
+    if (o.kind === "puddle") {
+      const inX = h.x > o.x + 6 && h.x < o.x + o.w - 6;
+      const grounded = h.y >= gy - HAM_R - 1;
+      if (inX && grounded) stumble("SPLASH!");
+    } else {
+      const oTop = gy - o.h;
+      if (hamBox.r > o.x + 6 && hamBox.l < o.x + o.w - 6 && hamBox.b > oTop + 8) {
+        stumble("OUCH!");
+        o.x = -999; // consumed so it can't hit twice
       }
     }
   }
-  $("wheel").setAttribute("transform", `rotate(${(S.angle * 180 / Math.PI).toFixed(1)} 200 200)`);
-  $("zone").setAttribute("d", arcPath(200, 200, 150, S.zoneStart - Math.PI/2, S.zoneStart - Math.PI/2 + S.zoneSize));
-  const [px, py] = polar(200, 200, 150, (S.bead - Math.PI/2));
-  $("bead").setAttribute("cx", px.toFixed(1)); $("bead").setAttribute("cy", py.toFixed(1));
-  $("bead").style.display = S.beadActive ? "block" : "none";
+
+  // bounce pads
+  G.pads = G.pads.filter(p => p.x > -60);
+  for (const p of G.pads) {
+    p.x -= sp * dt;
+    const padTop = gy - 24;
+    if (Math.abs(h.x - p.x) < 30 && h.vy >= 0 && h.y + HAM_R >= padTop && h.y + HAM_R <= padTop + 26) {
+      h.vy = -1240; h.jumps = 1;
+      sBounce();
+      burst(p.x, padTop, "#ffb3c8", 14);
+      floatText(p.x, padTop - 34, "BOING!", "#ffb3c8", false);
+    }
+  }
+
+  // pickups
+  G.pickups = G.pickups.filter(s => s.x > -40 && !s.taken);
+  for (const s of G.pickups) {
+    s.x -= sp * dt;
+    const dx = s.x - h.x, dy = s.y - h.y;
+    if (dx * dx + dy * dy < (HAM_R + 17) * (HAM_R + 17)) {
+      s.taken = true;
+      const val = (s.golden ? 5 : 1) * (G.live ? 2 : 1);
+      G.seeds += val;
+      if (s.golden) { sGold(); floatText(s.x, s.y - 24, "+" + val + " ⭐", "#ffd76a", true); }
+      else sSeed();
+      burst(s.x, s.y, s.golden ? "#ffd76a" : "#ffe066", s.golden ? 20 : 10);
+      syncHud();
+    }
+  }
+  if (((G.dist * 2) | 0) !== (((G.dist - sp * dt / 46) * 2) | 0)) syncHud();
+}
+
+/* ---------------- Render ---------------- */
+const clouds = Array.from({ length: 6 }, () => ({
+  x: Math.random(), y: 0.05 + Math.random() * 0.3, s: 0.5 + Math.random() * 0.9, v: 0.006 + Math.random() * 0.01,
+}));
+const flowers = Array.from({ length: 26 }, (_, i) => ({ off: i * 97 + (i * 37) % 61, kind: i % 3 }));
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  G.t += dt;
+  if (G.mode === "play" && !G.paused) update(dt);
+  draw(dt);
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
 
-// ---------- input ----------
-$("stage").addEventListener("pointerdown", e => { if (e.target.id !== "bigbtn") tap(); });
-window.addEventListener("keydown", e => {
-  if (e.code === "Space"){ e.preventDefault(); S.playing ? tap() : start(); }
-});
-$("bigbtn").addEventListener("click", e => { e.stopPropagation(); start(); });
-updateHud();
-if (location.hash === "#auto") setTimeout(start, 400);
+function draw(dt) {
+  const gy = groundY();
+  ctx.save();
+  if (G.shake > 0.2) {
+    ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+    G.shake *= Math.pow(0.0015, dt);
+  } else G.shake = 0;
+
+  /* sky */
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "#7ec8f7"); sky.addColorStop(0.6, "#bfe8ff"); sky.addColorStop(1, "#e8f9e0");
+  ctx.fillStyle = sky; ctx.fillRect(-20, -20, W + 40, H + 40);
+
+  /* sun */
+  ctx.fillStyle = "#ffd93b";
+  ctx.beginPath(); ctx.arc(W - 84, 76, 30, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,217,59,.35)";
+  ctx.beginPath(); ctx.arc(W - 84, 76, 44, 0, Math.PI * 2); ctx.fill();
+
+  /* clouds */
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  for (const c of clouds) {
+    c.x += c.v * dt * (G.mode === "play" ? 1.6 : 1); if (c.x > 1.15) c.x = -0.15;
+    const x = c.x * W, y = c.y * H * 0.7, s = c.s * 30;
+    ctx.beginPath();
+    ctx.ellipse(x, y, s * 1.5, s * 0.55, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - s * 0.7, y + 4, s * 0.9, s * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + s * 0.75, y + 4, s, s * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* hills (parallax) */
+  ctx.fillStyle = "#8fd07a";
+  ctx.beginPath();
+  for (let x = -20; x <= W + 20; x += 8) {
+    const wx = x + (G.scroll * 0.3 % 560);
+    const y = gy - 58 - Math.sin((x + G.scroll * 0.3) / 130) * 22 - 10;
+    x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W + 20, gy + 4); ctx.lineTo(-20, gy + 4); ctx.closePath(); ctx.fill();
+
+  /* ground */
+  ctx.fillStyle = "#69a84f";
+  ctx.fillRect(-20, gy, W + 40, H - gy + 20);
+  ctx.fillStyle = "#7cbf62";
+  ctx.fillRect(-20, gy, W + 40, 10);
+  /* dirt speckles scrolling */
+  ctx.fillStyle = "rgba(90,60,30,.35)";
+  const sp2 = 46;
+  for (let i = 0; i < W / sp2 + 2; i++) {
+    const x = i * sp2 - (G.scroll % sp2);
+    ctx.fillRect(x, gy + 22 + (i % 3) * 13, 12, 4);
+  }
+  /* flowers scrolling */
+  ctx.font = "15px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const f of flowers) {
+    const x = ((f.off - G.scroll * 1) % (W + 120) + W + 120) % (W + 120) - 60;
+    ctx.fillText(["🌼", "🌷", "🌱"][f.kind], x, gy + 16);
+  }
+
+  /* puddles (in-ground) */
+  for (const o of G.obs) {
+    if (o.kind !== "puddle") continue;
+    ctx.fillStyle = "#3f8fd2";
+    ctx.beginPath(); ctx.ellipse(o.x + o.w / 2, gy + 5, o.w / 2, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.5)";
+    ctx.beginPath(); ctx.ellipse(o.x + o.w / 2 - 8, gy + 3, o.w / 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /* bounce pads */
+  ctx.font = "34px serif";
+  for (const p of G.pads) ctx.fillText("🍄", p.x, gy - 14);
+
+  /* pickups */
+  for (const s of G.pickups) {
+    const bob = Math.sin(G.t * 4 + s.ph) * 4;
+    ctx.font = (s.golden ? 30 : 24) + "px serif";
+    if (s.golden) {
+      ctx.save();
+      ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 18;
+      ctx.fillText("⭐", s.x, s.y + bob);
+      ctx.restore();
+    } else ctx.fillText("🌻", s.x, s.y + bob);
+  }
+
+  /* obstacles */
+  for (const o of G.obs) {
+    if (o.kind === "puddle") continue;
+    const oy = gy - o.h / 2 - 2;
+    if (o.kind === "cheese") {
+      ctx.save();
+      ctx.translate(o.x + o.w / 2, oy);
+      ctx.rotate(o.rot);
+      ctx.font = "44px serif";
+      ctx.fillText("🧀", 0, 0);
+      ctx.restore();
+    } else {
+      ctx.font = (o.kind === "cactus" ? 52 : 42) + "px serif";
+      ctx.fillText(o.kind === "cactus" ? "🌵" : "🪨", o.x + o.w / 2, oy);
+    }
+  }
+
+  /* hamster */
+  const h = G.ham;
+  const grounded = h.y >= gy - HAM_R - 1;
+  const runBob = grounded && G.mode === "play" ? Math.abs(Math.sin(G.t * (10 + speed() / 40))) * 4 : 0;
+  const blink = h.inv > 0 && ((G.t * 14) | 0) % 2 === 0;
+  ctx.save();
+  ctx.translate(h.x, h.y - runBob);
+  ctx.rotate(h.rot);
+  ctx.globalAlpha = blink ? 0.35 : 1;
+  ctx.font = "46px serif";
+  ctx.fillText("🐹", 0, 2);
+  ctx.restore();
+  /* dust while running */
+  if (grounded && G.mode === "play" && Math.random() < 0.35) {
+    G.particles.push({ x: h.x - 18, y: gy - 2, vx: -40 - Math.random() * 60, vy: -20 - Math.random() * 40,
+      life: 0.4, t: 0, r: 2 + Math.random() * 2.5, col: "#cfe8c8" });
+  }
+
+  /* particles */
+  G.particles = G.particles.filter(p => (p.t += dt) < p.life);
+  for (const p of G.particles) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 380 * dt;
+    ctx.globalAlpha = 1 - p.t / p.life;
+    ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* floats */
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  G.floats = G.floats.filter(f => (f.t += dt) < f.life);
+  for (const f of G.floats) {
+    const k = f.t / f.life;
+    ctx.globalAlpha = 1 - k * k;
+    ctx.font = "900 " + (f.big ? 28 : 19) + "px 'Avenir Next','Segoe UI',sans-serif";
+    ctx.lineWidth = 5; ctx.strokeStyle = "rgba(10,30,12,.85)";
+    const y = f.y - k * 48;
+    ctx.strokeText(f.txt, f.x, y);
+    ctx.fillStyle = f.col;
+    ctx.fillText(f.txt, f.x, y);
+  }
+  ctx.globalAlpha = 1;
+
+  /* miss flash */
+  if (G.flash > 0.01) {
+    ctx.fillStyle = "rgba(255,40,40," + (G.flash * 0.25) + ")";
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+    G.flash *= Math.pow(0.002, dt);
+  }
+
+  if (G.paused && G.mode === "play") {
+    ctx.font = "900 34px 'Avenir Next','Segoe UI',sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 7; ctx.strokeStyle = "rgba(10,30,12,.85)";
+    ctx.strokeText("⏸ PAUSED", W / 2, H / 2);
+    ctx.fillStyle = "#fff"; ctx.fillText("⏸ PAUSED", W / 2, H / 2);
+  }
+
+  ctx.restore();
+}
+requestAnimationFrame(frame);
+syncHud();
 </script>
 </body>
 </html>
