@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Squeek Dash — Beat the Wheel</title>
+<meta name="description" content="A one-button arcade game about a hamster, a wheel, and perfect timing. Synced live with the real Squeekchain wheel: when the real hamster runs, your bonus doubles." />
+<style>
+  :root{
+    --paper:#fff6e9; --ink:#14213d; --coral:#f95738; --gold:#f2b035; --teal:#2a9d8f;
+    --card:#fffdf7; --line:#14213d22;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:ui-rounded,"Avenir Next","Segoe UI",system-ui,sans-serif;
+    min-height:100dvh; display:flex; flex-direction:column; align-items:center;
+  }
+  header{width:100%; max-width:560px; padding:18px 16px 4px; text-align:center}
+  h1{margin:0; font-size:clamp(28px,7vw,40px); letter-spacing:.5px}
+  h1 .dash{color:var(--coral)}
+  .tag{margin:4px 0 0; opacity:.75; font-size:14px}
+  #livebar{
+    margin:12px auto 0; max-width:520px; width:calc(100% - 32px);
+    border:2px solid var(--ink); border-radius:999px; padding:7px 14px;
+    display:flex; justify-content:space-between; gap:8px; align-items:center;
+    background:var(--card); font-size:13px; font-weight:600;
+  }
+  #livebar .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex:none}
+  #livebar.on .dot{background:#37d67a; box-shadow:0 0 0 4px #37d67a33; animation:pulse 1s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 7px #37d67a11}}
+  #livebar .bonus{color:var(--coral); display:none}
+  #livebar.on .bonus{display:inline}
+  main{width:100%; max-width:560px; padding:8px 16px 0; display:flex; flex-direction:column; align-items:center}
+  #hud{
+    width:100%; display:flex; justify-content:space-between; align-items:center;
+    font-weight:800; font-size:15px; padding:6px 2px;
+  }
+  #hud .hearts{letter-spacing:2px; color:var(--coral)}
+  #stage{
+    position:relative; width:min(92vw,440px); aspect-ratio:1; margin:4px auto;
+    touch-action:manipulation; user-select:none; cursor:pointer;
+  }
+  #stage.shake{animation:shake .3s}
+  @keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  svg{width:100%; height:100%; display:block}
+  #callout{
+    position:absolute; left:50%; top:8px; transform:translateX(-50%);
+    font-weight:900; font-size:20px; color:var(--teal); opacity:0; pointer-events:none;
+    transition:opacity .15s, transform .15s; text-shadow:0 2px 0 #fff;
+  }
+  #callout.show{opacity:1; transform:translateX(-50%) translateY(4px) scale(1.08)}
+  #bigbtn{
+    margin:10px 0 4px; background:var(--coral); color:#fff; border:3px solid var(--ink);
+    border-radius:999px; padding:14px 42px; font-size:19px; font-weight:900; letter-spacing:.5px;
+    box-shadow:0 4px 0 var(--ink); cursor:pointer; font-family:inherit;
+  }
+  #bigbtn:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ink)}
+  .howto{max-width:520px; font-size:14px; line-height:1.55; opacity:.85; text-align:center; margin:10px 16px 0}
+  #overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#fff6e9ee; border-radius:24px; text-align:center; padding:20px; gap:8px;
+  }
+  #overlay h2{margin:0; font-size:30px}
+  #overlay p{margin:0; font-size:15px; line-height:1.5}
+  #overlay .score{font-size:20px; font-weight:900}
+  footer{margin-top:auto; width:100%; max-width:560px; padding:22px 16px 26px; text-align:center; font-size:13px; opacity:.75; line-height:1.6}
+  footer a{color:var(--ink); font-weight:700}
+  .kbd{border:1.5px solid var(--ink); border-bottom-width:3px; border-radius:6px; padding:0 6px; font-weight:800; background:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>SQUEEK <span class="dash">DASH</span></h1>
+  <p class="tag">One hamster. One wheel. One perfectly timed hop.</p>
+  <div id="livebar"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span><span id="livetext">Real wheel: connecting…</span></span><span class="bonus">ZOOMIES BONUS ×2</span></div>
+</header>
+
+<main>
+  <div id="hud">
+    <span>🌰 <span id="seeds">0</span></span>
+    <span id="combo">COMBO ×1</span>
+    <span>LV <span id="level">1</span></span>
+    <span class="hearts" id="hearts">♥♥♥</span>
+  </div>
+
+  <div id="stage" aria-label="Game stage. Tap or press space when the bead crosses the golden zone.">
+    <svg viewBox="0 0 400 400" role="img" aria-label="A hamster running in a wheel">
+      <!-- golden catch zone -->
+      <path id="zone" fill="none" stroke="#f2b035" stroke-width="17" stroke-linecap="round" opacity="0.95"/>
+      <!-- wheel -->
+      <g id="wheel">
+        <circle cx="200" cy="200" r="150" fill="none" stroke="#14213d" stroke-width="10"/>
+        <circle cx="200" cy="200" r="128" fill="none" stroke="#14213d" stroke-width="3" opacity="0.35"/>
+        <g stroke="#14213d" stroke-width="7" stroke-linecap="round">
+          <line x1="200" y1="200" x2="200" y2="58"/><line x1="200" y1="200" x2="323" y2="129"/>
+          <line x1="200" y1="200" x2="323" y2="271"/><line x1="200" y1="200" x2="200" y2="342"/>
+          <line x1="200" y1="200" x2="77" y2="271"/><line x1="200" y1="200" x2="77" y2="129"/>
+        </g>
+        <!-- hamster riding the rim -->
+        <g id="hamster" transform="translate(200 200)">
+          <ellipse cx="0" cy="-158" rx="30" ry="24" fill="#e8a04c"/>
+          <circle cx="-16" cy="-178" r="9" fill="#e8a04c"/><circle cx="16" cy="-178" r="9" fill="#e8a04c"/>
+          <circle cx="-16" cy="-178" r="4.5" fill="#f7cf9f"/><circle cx="16" cy="-178" r="4.5" fill="#f7cf9f"/>
+          <ellipse cx="10" cy="-152" rx="13" ry="10" fill="#f7cf9f"/>
+          <circle cx="20" cy="-160" r="3.4" fill="#14213d"/>
+          <circle cx="-4" cy="-164" r="3" fill="#14213d"/>
+          <path d="M 26 -150 q 8 3 5 9" stroke="#14213d" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        </g>
+        <circle cx="200" cy="200" r="17" fill="#f95738" stroke="#14213d" stroke-width="5"/>
+      </g>
+      <!-- the bead to catch -->
+      <circle id="bead" r="13" fill="#2a9d8f" stroke="#14213d" stroke-width="4"/>
+      <!-- stand -->
+      <path d="M200 350 L150 392 M200 350 L250 392" stroke="#14213d" stroke-width="9" stroke-linecap="round"/>
+    </svg>
+    <div id="callout"></div>
+    <div id="overlay">
+      <h2 id="ovtitle">Ready?</h2>
+      <p id="ovtext">The bead rides the rim. Tap (or press <span class="kbd">SPACE</span>) the moment it crosses the <b>golden zone</b> to snatch the seed. Bad taps cost a heart — the wheel only speeds up from here.</p>
+      <p class="score" id="ovscore" style="display:none"></p>
+      <button id="bigbtn">START</button>
+      <p style="font-size:13px;opacity:.7">Best: <span id="best">0</span> 🌰</p>
+    </div>
+  </div>
+
+  <p class="howto">The wheel breathes like a real hamster — naps, jogs, and sudden zoomies. And it listens to the <b>actual Squeekchain wheel</b>: when the real hamster runs, your seed bonus doubles. Nobody knows when. That's the game.</p>
+</main>
+
+<footer>
+  Built for <a href="https://squeekchain.com/genesis" target="_blank" rel="noopener">Squeekchain Genesis</a> — the hamster-powered toychain on Ethereum.<br/>
+  A community mini-game by Squeekbo. Not affiliated with the Squeekchain team. Sepolia testnet era.
+</footer>
+
+<script>
+"use strict";
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2;
+const polar = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+function arcPath(cx, cy, r, a0, a1){
+  const [x0,y0] = polar(cx,cy,r,a0), [x1,y1] = polar(cx,cy,r,a1);
+  return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${a1-a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+
+// ---------- live wheel feed (seasoning; game is fully playable offline) ----------
+const live = { on:false, rpm:0, status:"—" };
+async function pollLive(){
+  try{
+    const r = await fetch("https://api.squeekchain.com/v1/status", { cache:"no-store" });
+    const j = await r.json();
+    const m = j.measurement || {};
+    live.rpm = (m.rpmMilli || 0) / 1000;
+    live.status = m.coreStatus || "—";
+    live.on = live.rpm > 0;
+  }catch(e){ live.on = false; live.status = "offline"; }
+  $("livebar").classList.toggle("on", live.on);
+  $("livetext").textContent = live.on
+    ? `Real wheel: RUNNING at ${live.rpm.toFixed(1)} RPM`
+    : `Real wheel: ${live.status === "IDLE" ? "napping" : live.status.toLowerCase()} — bonus armed when it runs`;
+}
+pollLive(); setInterval(pollLive, 5000);
+
+// ---------- game state ----------
+const S = {
+  playing:false, angle:0, speed:0, bead:0, beadActive:false,
+  seeds:0, combo:1, bestCombo:1, lives:3, level:1, collected:0,
+  zoneStart:-0.65, zoneSize:0.55, engineT:0, engineState:"jog", engineDur:5,
+  lastTs:0, grace:0,
+};
+const best = +(localStorage.getItem("squeekdash_best") || 0);
+$("best").textContent = best;
+
+// hamster engine: nap / jog / zoomies bouts, weighted like a real hamster's week
+const ENGINE = {
+  nap:     { target: 0.55, w: 62, dur:[3,7]  },
+  jog:     { target: 1.55, w: 20, dur:[4,9]  },
+  zoomies: { target: 3.1,  w: 18, dur:[3,6]  },
+};
+function pickEngine(){
+  let r = Math.random() * 100, acc = 0;
+  for (const k in ENGINE){ acc += ENGINE[k].w; if (r <= acc) return k; }
+  return "jog";
+}
+function newBout(){
+  S.engineState = pickEngine();
+  const [a,b] = ENGINE[S.engineState].dur;
+  S.engineDur = a + Math.random() * (b - a);
+  S.engineT = 0;
+}
+function spawnBead(){
+  // bead appears ahead of the zone, riding the rim in the wheel's direction
+  S.bead = S.zoneStart - (1.1 + Math.random() * 1.6);
+  S.beadActive = true;
+}
+function zoneEnd(){ return S.zoneStart + S.zoneSize; }
+function inZone(a){ return a >= S.zoneStart && a <= zoneEnd(); }
+
+function callout(txt, color){
+  const c = $("callout");
+  c.textContent = txt; c.style.color = color || "#2a9d8f";
+  c.classList.add("show");
+  setTimeout(() => c.classList.remove("show"), 650);
+}
+function stumble(){
+  S.lives--; S.combo = 1;
+  $("stage").classList.remove("shake"); void $("stage").offsetWidth;
+  $("stage").classList.add("shake");
+  callout("OUCH!", "#f95738");
+  updateHud();
+  if (S.lives <= 0) gameOver();
+}
+function collect(){
+  const mult = S.combo * (live.on ? 2 : 1);
+  const gained = 10 * mult;
+  S.seeds += gained; S.collected++;
+  callout(`+${gained} 🌰`, live.on ? "#f95738" : "#2a9d8f");
+  S.combo = Math.min(8, S.combo + 1);
+  S.bestCombo = Math.max(S.bestCombo, S.combo);
+  if (S.collected % 10 === 0){
+    S.level++;
+    S.zoneSize = Math.max(0.16, S.zoneSize * 0.88);
+    callout("LEVEL " + S.level + "!", "#14213d");
+  }
+  S.beadActive = false;
+  setTimeout(() => { if (S.playing) spawnBead(); }, 350);
+  updateHud();
+}
+function tap(){
+  if (!S.playing) return;
+  if (S.beadActive && inZone(S.bead)) collect();
+  else if (S.beadActive) stumble();
+}
+function gameOver(){
+  S.playing = false;
+  const isBest = S.seeds > best;
+  if (isBest) localStorage.setItem("squeekdash_best", S.seeds);
+  $("best").textContent = Math.max(best, S.seeds);
+  $("ovtitle").textContent = "The wheel rests.";
+  $("ovtext").innerHTML = isBest ? "A new personal best. The hamster is proud of you." : "The seed stash is safe. The wheel, however, believes in you.";
+  $("ovscore").style.display = "block";
+  $("ovscore").textContent = `${S.seeds} 🌰 · best combo ×${S.bestCombo} · level ${S.level}`;
+  $("bigbtn").textContent = "RUN AGAIN";
+  $("overlay").style.display = "flex";
+}
+function start(){
+  Object.assign(S, { playing:true, seeds:0, combo:1, bestCombo:1, lives:3, level:1,
+    collected:0, zoneSize:0.55, speed:1.2, beadActive:false });
+  newBout(); spawnBead();
+  $("overlay").style.display = "none";
+  updateHud();
+}
+function updateHud(){
+  $("seeds").textContent = S.seeds;
+  $("combo").textContent = "COMBO ×" + S.combo * (live.on ? 2 : 1);
+  $("level").textContent = S.level;
+  $("hearts").textContent = "♥".repeat(Math.max(0, S.lives)) + "♡".repeat(Math.max(0, 3 - S.lives));
+}
+
+// ---------- render loop ----------
+function frame(ts){
+  const dt = Math.min(0.05, (ts - S.lastTs) / 1000 || 0);
+  S.lastTs = ts;
+  if (S.playing){
+    S.engineT += dt;
+    if (S.engineT >= S.engineDur) newBout();
+    const target = ENGINE[S.engineState].target * (1 + (S.level - 1) * 0.07);
+    S.speed += (target - S.speed) * Math.min(1, dt * 1.4);
+    S.angle = (S.angle + S.speed * dt) % TAU;
+    if (S.beadActive){
+      S.bead += S.speed * dt;
+      if (S.bead > zoneEnd() + 0.02){ // slipped past the zone untouched
+        S.beadActive = false; S.combo = 1; updateHud();
+        setTimeout(() => { if (S.playing) spawnBead(); }, 300);
+      }
+    }
+  }
+  $("wheel").setAttribute("transform", `rotate(${(S.angle * 180 / Math.PI).toFixed(1)} 200 200)`);
+  $("zone").setAttribute("d", arcPath(200, 200, 150, S.zoneStart - Math.PI/2, S.zoneStart - Math.PI/2 + S.zoneSize));
+  const [px, py] = polar(200, 200, 150, (S.bead - Math.PI/2));
+  $("bead").setAttribute("cx", px.toFixed(1)); $("bead").setAttribute("cy", py.toFixed(1));
+  $("bead").style.display = S.beadActive ? "block" : "none";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- input ----------
+$("stage").addEventListener("pointerdown", e => { if (e.target.id !== "bigbtn") tap(); });
+window.addEventListener("keydown", e => {
+  if (e.code === "Space"){ e.preventDefault(); S.playing ? tap() : start(); }
+});
+$("bigbtn").addEventListener("click", e => { e.stopPropagation(); start(); });
+updateHud();
+if (location.hash === "#auto") setTimeout(start, 400);
+</script>
+</body>
+</html>
